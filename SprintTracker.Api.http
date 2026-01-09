@@ -1,0 +1,122 @@
+@SprintTracker.Api_HostAddress = http://localhost:5000
+
+### Health Check
+GET {{SprintTracker.Api_HostAddress}}/health
+
+### Register New User (Manager)
+POST {{SprintTracker.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "manager@mphasis.com",
+  "password": "Manager123!",
+  "firstName": "John",
+  "lastName": "Manager",
+  "role": 1
+}
+
+### Register New User (Developer)
+POST {{SprintTracker.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "developer@mphasis.com",
+  "password": "Dev123!",
+  "firstName": "Jane",
+  "lastName": "Developer",
+  "role": 3
+}
+
+### Login
+POST {{SprintTracker.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "manager@mphasis.com",
+  "password": "Manager123!"
+}
+
+### Get Current User (requires Bearer token)
+GET {{SprintTracker.Api_HostAddress}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### Create Project
+POST {{SprintTracker.Api_HostAddress}}/api/projects
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Sprint Tracker Development",
+  "key": "STD",
+  "description": "Main Sprint Tracker project development",
+  "startDate": "2024-01-01",
+  "targetEndDate": "2024-12-31"
+}
+
+### Get All Projects
+GET {{SprintTracker.Api_HostAddress}}/api/projects
+Authorization: Bearer {{token}}
+
+### Create Sprint
+POST {{SprintTracker.Api_HostAddress}}/api/sprints
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "projectId": "{{projectId}}",
+  "name": "Sprint 1",
+  "goal": "Complete initial setup and core features",
+  "startDate": "2024-01-15",
+  "endDate": "2024-01-29"
+}
+
+### Get Sprints by Project
+GET {{SprintTracker.Api_HostAddress}}/api/sprints/project/{{projectId}}
+Authorization: Bearer {{token}}
+
+### Start Sprint
+POST {{SprintTracker.Api_HostAddress}}/api/sprints/{{sprintId}}/start
+Authorization: Bearer {{token}}
+
+### Create Task
+POST {{SprintTracker.Api_HostAddress}}/api/tasks
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "projectId": "{{projectId}}",
+  "sprintId": "{{sprintId}}",
+  "title": "Implement user authentication",
+  "description": "Add JWT-based authentication",
+  "type": 1,
+  "priority": 3,
+  "storyPoints": 5,
+  "estimatedHours": 8
+}
+
+### Get My Tasks
+GET {{SprintTracker.Api_HostAddress}}/api/tasks/my-tasks
+Authorization: Bearer {{token}}
+
+### Update Task Status
+PATCH {{SprintTracker.Api_HostAddress}}/api/tasks/{{taskId}}/status
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+1
+
+### Get Dashboard Stats
+GET {{SprintTracker.Api_HostAddress}}/api/dashboard
+Authorization: Bearer {{token}}
+
+### Get Burndown Data
+GET {{SprintTracker.Api_HostAddress}}/api/sprints/{{sprintId}}/burndown
+Authorization: Bearer {{token}}
+
+### Get Velocity Data
+GET {{SprintTracker.Api_HostAddress}}/api/sprints/project/{{projectId}}/velocity
+Authorization: Bearer {{token}}
+
+### Get Users
+GET {{SprintTracker.Api_HostAddress}}/api/users
+Authorization: Bearer {{token}}
