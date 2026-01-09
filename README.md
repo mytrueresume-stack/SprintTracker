@@ -153,18 +153,3 @@ The frontend will be available at `http://localhost:3000`
 - Accent: `#F7941D`
 - Dark: `#003366`
 
-## Sample Login Credentials
-
-After registering, use these test accounts:
-
-**Manager:**
-- Email: manager@mphasis.com
-- Password: Manager123!
-
-**Developer:**
-- Email: developer@mphasis.com
-- Password: Dev123!
-
-## License
-
-Copyright 2024 Mphasis. Internal Use Only.
