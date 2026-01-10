@@ -5,8 +5,9 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { sprintService } from '@/services/sprintService';
 import { sprintSubmissionService } from '@/services/sprintSubmissionService';
-import { Sprint, SprintReportData } from '@/types';
+import { Sprint, SprintReportData, UserRole } from '@/types';
 import { Card, Loader, Badge, StatCard, EmptyState } from '@/components/ui';
+import { useAuthStore } from '@/store/authStore';
 import { ArrowLeft, Users, Target, Clock, AlertTriangle, Award, TrendingUp, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -22,11 +23,19 @@ export default function SprintReportPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const { user } = useAuthStore();
+  const isManager = user?.role === UserRole.Manager || user?.role === UserRole.Admin;
+
   useEffect(() => {
     if (sprintId) {
+      if (!isManager) {
+        setError('You are not authorized to view reports. Only Manager or Admin can access this page.');
+        setIsLoading(false);
+        return;
+      }
       loadData();
     }
-  }, [sprintId]);
+  }, [sprintId, isManager]);
 
   const loadData = async () => {
     try {
@@ -73,6 +82,28 @@ export default function SprintReportPage() {
     planned: user.storyPointsPlanned,
     completed: user.storyPointsCompleted,
   })) || [];
+
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserDetail, setSelectedUserDetail] = useState<any | null>(null);
+
+  const openUserDetail = (userId: string) => {
+    setSelectedUserId(userId);
+    // Build detail view from report data
+    const user = report?.userBreakdown?.find(u => u.userId === userId);
+    if (!user) return;
+
+    const userStories = (report?.userStories || []).filter(us => us.reportedBy === user.userName);
+    const features = (report?.features || []).filter(f => f.deliveredBy === user.userName);
+    const impediments = (report?.impediments || []).filter(i => i.reportedBy === user.userName);
+    const appreciations = (report?.appreciations || []).filter(a => a.givenBy === user.userName);
+
+    setSelectedUserDetail({ user, userStories, features, impediments, appreciations });
+  };
+
+  const closeUserDetail = () => {
+    setSelectedUserId(null);
+    setSelectedUserDetail(null);
+  };
 
   const hoursData = report?.userBreakdown?.map(user => ({
     name: user.userName.split(' ')[0],
@@ -178,7 +209,7 @@ export default function SprintReportPage() {
                         outerRadius={80}
                         paddingAngle={5}
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent = 0 }) => `${name} ${(percent * 100).toFixed(0)}%`}
                       >
                         {statusData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -261,6 +292,7 @@ export default function SprintReportPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stories</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Features</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -277,6 +309,9 @@ export default function SprintReportPage() {
                         <Badge variant={user.submissionStatus === 'Submitted' ? 'success' : 'warning'}>
                           {user.submissionStatus}
                         </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button onClick={() => openUserDetail(user.userId)} className="text-sm text-blue-600 hover:underline">View</button>
                       </td>
                     </tr>
                   ))}
@@ -329,6 +364,73 @@ export default function SprintReportPage() {
                 ))}
               </div>
             </Card>
+          )}
+
+          {selectedUserDetail && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black opacity-40" onClick={closeUserDetail}></div>
+              <div className="relative bg-white rounded-lg shadow-lg max-w-3xl w-full p-6">
+                <div className="flex items-start justify-between">
+                  <h3 className="text-lg font-semibold">{selectedUserDetail.user.userName}</h3>
+                  <button onClick={closeUserDetail} className="text-gray-500">Close</button>
+                </div>
+
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <h4 className="font-medium">Stats</h4>
+                    <p>Story Points: {selectedUserDetail.user.storyPointsCompleted} / {selectedUserDetail.user.storyPointsPlanned}</p>
+                    <p>Hours: {selectedUserDetail.user.hoursWorked}h</p>
+                    <p>Stories: {selectedUserDetail.user.userStoriesCount}</p>
+                    <p>Features: {selectedUserDetail.user.featuresCount}</p>
+                    <p>Status: {selectedUserDetail.user.submissionStatus}</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium">Narrative</h4>
+                    <p className="whitespace-pre-wrap">{selectedUserDetail.user.achievements || '—'}</p>
+                    <p className="whitespace-pre-wrap text-sm text-gray-600 mt-2">Learnings: {selectedUserDetail.user.learnings || '—'}</p>
+                    <p className="whitespace-pre-wrap text-sm text-gray-600 mt-2">Next sprint: {selectedUserDetail.user.nextSprintGoals || '—'}</p>
+                    {selectedUserDetail.user.additionalNotes && (
+                      <p className="whitespace-pre-wrap text-sm text-gray-600 mt-2">Notes: {selectedUserDetail.user.additionalNotes}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium">Stories</h4>
+                    {selectedUserDetail.userStories.length === 0 ? <p className="text-sm text-gray-500">No stories reported</p> : (
+                      <ul className="list-disc ml-5">
+                        {selectedUserDetail.userStories.map((s: any, idx: number) => (
+                          <li key={idx} className="text-sm text-gray-700">{s.title} — {s.storyPoints} pts</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium">Features</h4>
+                    {selectedUserDetail.features.length === 0 ? <p className="text-sm text-gray-500">No features reported</p> : (
+                      <ul className="list-disc ml-5">
+                        {selectedUserDetail.features.map((f: any, idx: number) => (
+                          <li key={idx} className="text-sm text-gray-700">{f.featureName}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium">Impediments</h4>
+                    {selectedUserDetail.impediments.length === 0 ? <p className="text-sm text-gray-500">No impediments reported</p> : (
+                      <ul className="list-disc ml-5">
+                        {selectedUserDetail.impediments.map((i: any, idx: number) => (
+                          <li key={idx} className="text-sm text-gray-700">{i.description}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}

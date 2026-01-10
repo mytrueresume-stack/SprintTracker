@@ -4,7 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { LayoutDashboard, FolderKanban, LogOut, Menu, X, User } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, LogOut, Menu, X, User, Sun } from 'lucide-react';
+import { Badge } from './ui';
+import { UserRole } from '@/types';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -20,6 +22,7 @@ export default function Navbar() {
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/projects', label: 'Projects', icon: FolderKanban },
+    { href: '/weather', label: 'Weather', icon: Sun },
   ];
 
   if (!isAuthenticated) {
@@ -62,9 +65,16 @@ export default function Navbar() {
                 <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                   <User className="h-4 w-4 text-blue-600" />
                 </div>
-                <span className="text-sm font-medium text-gray-700">
-                  {user?.firstName} {user?.lastName}
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    {user?.firstName} {user?.lastName}
+                  </span>
+                  {user && (
+                    <Badge variant={user.role === UserRole.Admin ? 'success' : user.role === UserRole.Manager ? 'info' : 'default'}>
+                      {user.role === UserRole.Admin ? 'Admin' : user.role === UserRole.Manager ? 'Manager' : 'Developer'}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <button
                 onClick={handleLogout}
@@ -114,9 +124,16 @@ export default function Navbar() {
                 <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                   <User className="h-4 w-4 text-blue-600" />
                 </div>
-                <span className="ml-2 text-sm font-medium text-gray-700">
-                  {user?.firstName} {user?.lastName}
-                </span>
+                <div className="ml-2 flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    {user?.firstName} {user?.lastName}
+                  </span>
+                  {user && (
+                    <Badge variant={user.role === UserRole.Admin ? 'success' : user.role === UserRole.Manager ? 'info' : 'default'}>
+                      {user.role === UserRole.Admin ? 'Admin' : user.role === UserRole.Manager ? 'Manager' : 'Developer'}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <button
                 onClick={handleLogout}

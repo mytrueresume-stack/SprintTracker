@@ -257,6 +257,64 @@ export interface AppreciationReport {
   givenBy: string;
 }
 
+// Weather types
+export interface LocationSuggestion {
+  name: string;
+  lat: number;
+  lon: number;
+}
+
+export interface WeatherCondition {
+  main: string;
+  description: string;
+  icon: string;
+}
+
+export interface CurrentWeather {
+  dt: number; // epoch ms
+  temp: number;
+  feelsLike?: number | null;
+  humidity?: number | null;
+  windSpeed?: number | null;
+  windDeg?: number | null;
+  pressure?: number | null;
+  uvi?: number | null;
+  weatherCode: number;
+  weatherDescription: string;
+  weatherIcon: string; // emoji or short icon string
+  sunrise?: number | null;
+  sunset?: number | null;
+}
+
+export interface HourlyWeather {
+  dt: number; // epoch ms
+  temp: number;
+  pop?: number | null; // probability of precipitation
+  windSpeed?: number | null;
+  windDeg?: number | null;
+  uvi?: number | null;
+  pressure?: number | null;
+  weatherCode?: number | null;
+}
+
+export interface DailyWeather {
+  dt: number; // epoch ms
+  tempMin: number;
+  tempMax: number;
+  pop?: number | null;
+  sunrise: number;
+  sunset: number;
+  weatherCode: number;
+}
+
+export interface WeatherReport {
+  timezone: string;
+  timezoneOffset: number;
+  current: CurrentWeather;
+  hourly: HourlyWeather[];
+  daily: DailyWeather[];
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data: T | null;

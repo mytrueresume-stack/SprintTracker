@@ -25,6 +25,10 @@ builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ISprintSubmissionService, SprintSubmissionService>();
 
+// Weather proxy service (server-side calls to OpenWeatherMap)
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IWeatherService, WeatherService>();
+
 // Add Controllers with JSON options
 builder.Services.AddControllers(options =>
 {

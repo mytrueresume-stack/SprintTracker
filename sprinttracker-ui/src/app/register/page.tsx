@@ -38,8 +38,16 @@ export default function RegisterPage() {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    // Enforce stronger password rules (match server-side validation)
+    const pwd = formData.password;
+    if (pwd.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
+    const complexity = /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/;
+    if (!complexity.test(pwd)) {
+      setError('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
       return;
     }
 
@@ -58,11 +66,28 @@ export default function RegisterPage() {
         setAuth(response.data.token, response.data.user);
         router.push('/dashboard');
       } else {
-        setError(response.message || 'Registration failed');
+        // Show server side validation errors if present
+        if (response.errors && response.errors.length > 0) {
+          setError(response.errors.join('; '));
+        } else {
+          setError(response.message || 'Registration failed');
+        }
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-      setError(errorMessage);
+    } catch (err: any) {
+      // Handle Axios and server validation errors
+      if (err?.isAxiosError && err.response?.data) {
+        const serverData = err.response.data as any;
+        if (serverData.errors && serverData.errors.length > 0) {
+          setError(serverData.errors.join('; '));
+        } else if (serverData.message) {
+          setError(serverData.message);
+        } else {
+          setError(err.message || 'An error occurred');
+        }
+      } else {
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -133,7 +158,7 @@ export default function RegisterPage() {
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               required
               autoComplete="new-password"
-              placeholder="At least 6 characters"
+              placeholder="At least 8 chars, include upper, lower, number & special"
             />
 
             <Input

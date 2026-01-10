@@ -77,6 +77,14 @@ User?.Identity?.Name ?? "Anonymous", string.Join(", ", errors));
        return Unauthorized(new ApiResponse<ProjectDto>(false, null, "Authentication required", null));
         }
 
+        // Authorization: only Manager or Admin can create projects
+        var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Developer";
+        if (roleClaim != SprintTracker.Api.Models.UserRole.Manager.ToString() && roleClaim != SprintTracker.Api.Models.UserRole.Admin.ToString())
+        {
+            _logger.LogWarning("CreateProject forbidden for user {User} with role {Role}", User?.Identity?.Name ?? "Unknown", roleClaim);
+            return StatusCode(StatusCodes.Status403Forbidden, new ApiResponse<ProjectDto>(false, null, "Insufficient permissions", null));
+        }
+
         // Map DTO to domain request with defensive normalization
         var createReq = new CreateProjectRequest(
    request.Name?.Trim() ?? string.Empty,

@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { projectService } from '@/services/projectService';
-import { Project, ProjectStatus } from '@/types';
+import { Project, ProjectStatus, UserRole } from '@/types';
+import { useAuthStore } from '@/store/authStore';
 import { Card, Button, Loader, Badge, EmptyState, Modal, Input, Textarea } from '@/components/ui';
 import { Plus, FolderKanban, Users, Calendar, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
@@ -21,6 +22,9 @@ export default function ProjectsPage() {
     startDate: '',
     targetEndDate: '',
   });
+
+  const { user } = useAuthStore();
+  const canManageProjects = user?.role === UserRole.Manager || user?.role === UserRole.Admin;
 
   useEffect(() => {
     loadProjects();
@@ -44,12 +48,45 @@ export default function ProjectsPage() {
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+
+    // Client-side validation matching server rules
+    if (!formData.name || formData.name.trim().length < 2) {
+      setError('Project name must be at least 2 characters');
+      return;
+    }
+
+    const key = formData.key.toUpperCase().trim();
+    const keyRegex = /^[A-Z0-9]{2,10}$/;
+    if (!keyRegex.test(key)) {
+      setError('Project key must be 2-10 characters, uppercase letters and numbers only');
+      return;
+    }
+
+    if (formData.description && formData.description.length > 2000) {
+      setError('Description cannot exceed 2000 characters');
+      return;
+    }
+
+    if (formData.startDate && formData.targetEndDate) {
+      const sd = new Date(formData.startDate);
+      const te = new Date(formData.targetEndDate);
+      if (isNaN(sd.getTime()) || isNaN(te.getTime())) {
+        setError('Invalid dates provided');
+        return;
+      }
+      if (te < sd) {
+        setError('Target end date must be after start date');
+        return;
+      }
+    }
+
     setIsCreating(true);
 
     try {
       const response = await projectService.createProject({
-        name: formData.name,
-        key: formData.key.toUpperCase(),
+        name: formData.name.trim(),
+        key,
         description: formData.description || undefined,
         startDate: formData.startDate || undefined,
         targetEndDate: formData.targetEndDate || undefined,
@@ -60,10 +97,27 @@ export default function ProjectsPage() {
         setIsModalOpen(false);
         setFormData({ name: '', key: '', description: '', startDate: '', targetEndDate: '' });
       } else {
-        setError(response.message || 'Failed to create project');
+        // show server-side validation if present
+        if (response.errors && response.errors.length > 0) {
+          setError(response.errors.join('; '));
+        } else {
+          setError(response.message || 'Failed to create project');
+        }
       }
-    } catch (err) {
-      setError('Failed to create project');
+    } catch (err: any) {
+      // Handle axios/server errors
+      if (err?.isAxiosError && err.response?.data) {
+        const serverData = err.response.data as any;
+        if (serverData.errors && serverData.errors.length > 0) {
+          setError(serverData.errors.join('; '));
+        } else if (serverData.message) {
+          setError(serverData.message);
+        } else {
+          setError('Failed to create project');
+        }
+      } else {
+        setError('Failed to create project');
+      }
       console.error(err);
     } finally {
       setIsCreating(false);
@@ -96,10 +150,12 @@ export default function ProjectsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
           <p className="text-gray-600 mt-1">Manage your development projects</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Project
-        </Button>
+        {canManageProjects && (
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Project
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -157,10 +213,12 @@ export default function ProjectsPage() {
             description="Create your first project to start tracking sprints"
             icon={<FolderKanban className="h-8 w-8 text-gray-400" />}
             action={
-              <Button onClick={() => setIsModalOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Project
-              </Button>
+              canManageProjects ? (
+                <Button onClick={() => setIsModalOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Project
+                </Button>
+              ) : undefined
             }
           />
         </Card>

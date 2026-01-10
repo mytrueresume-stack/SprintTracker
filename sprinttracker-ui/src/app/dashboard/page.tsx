@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { dashboardService } from '@/services/dashboardService';
 import { DashboardStats, SprintStatus } from '@/types';
 import { Card, StatCard, Loader, Badge, EmptyState, ProgressRing } from '@/components/ui';
+import WeatherBoard from '@/components/WeatherBoard';
 import { FolderKanban, Zap, CheckCircle, Clock, ArrowRight, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 

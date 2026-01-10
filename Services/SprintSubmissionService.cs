@@ -339,21 +339,29 @@ return result.DeletedCount > 0;
             // Distinct team members who submitted
             var totalTeamMembers = submissions.Select(s => s.UserId).Where(u => !string.IsNullOrWhiteSpace(u)).Distinct().Count();
 
-            // Per user breakdown (aggregate across multiple submissions by same user)
+            // Per user breakdown — pick the latest submission per user to show exact stats developers entered
             var userBreakdown = submissions
                 .GroupBy(s => s.UserId)
-                .Select(g => new UserSprintSummary
+                .Select(g =>
                 {
-                    UserId = g.Key,
-                    UserName = userDict.TryGetValue(g.Key, out var u) ? u.FullName : "Unknown",
-                    StoryPointsPlanned = g.Sum(x => x.StoryPointsPlanned),
-                    StoryPointsCompleted = g.Sum(x => x.StoryPointsCompleted),
-                    HoursWorked = g.Sum(x => x.HoursWorked),
-                    UserStoriesCount = g.Sum(x => (x.UserStories ?? Enumerable.Empty<UserStoryEntry>()).Count()),
-                    FeaturesCount = g.Sum(x => (x.FeaturesDelivered ?? Enumerable.Empty<FeatureEntry>()).Count()),
-                    ImpedimentsCount = g.Sum(x => (x.Impediments ?? Enumerable.Empty<ImpedimentEntry>()).Count()),
-                    AppreciationsGiven = g.Sum(x => (x.Appreciations ?? Enumerable.Empty<AppreciationEntry>()).Count()),
-                    SubmissionStatus = string.Join(",", g.Select(x => x.Status.ToString()).Distinct())
+                    var latest = g.OrderByDescending(x => x.UpdatedAt).First();
+                    return new UserSprintSummary
+                    {
+                        UserId = g.Key,
+                        UserName = userDict.TryGetValue(g.Key, out var u) ? u.FullName : "Unknown",
+                        StoryPointsPlanned = latest.StoryPointsPlanned,
+                        StoryPointsCompleted = latest.StoryPointsCompleted,
+                        HoursWorked = latest.HoursWorked,
+                        UserStoriesCount = (latest.UserStories ?? Enumerable.Empty<UserStoryEntry>()).Count(),
+                        FeaturesCount = (latest.FeaturesDelivered ?? Enumerable.Empty<FeatureEntry>()).Count(),
+                        ImpedimentsCount = (latest.Impediments ?? Enumerable.Empty<ImpedimentEntry>()).Count(),
+                        AppreciationsGiven = (latest.Appreciations ?? Enumerable.Empty<AppreciationEntry>()).Count(),
+                        SubmissionStatus = latest.Status.ToString(),
+                        Achievements = latest.Achievements,
+                        Learnings = latest.Learnings,
+                        NextSprintGoals = latest.NextSprintGoals,
+                        AdditionalNotes = latest.AdditionalNotes
+                    };
                 }).ToList();
 
             // All user stories (null-safe)
@@ -472,6 +480,12 @@ public class UserSprintSummary
     public int ImpedimentsCount { get; set; }
     public int AppreciationsGiven { get; set; }
     public string SubmissionStatus { get; set; } = null!;
+
+    // Exact textual fields entered by the user (displayed to managers on detail view)
+    public string? Achievements { get; set; }
+    public string? Learnings { get; set; }
+    public string? NextSprintGoals { get; set; }
+    public string? AdditionalNotes { get; set; }
 }
 
 public class UserStoryReport

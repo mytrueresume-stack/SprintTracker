@@ -289,15 +289,21 @@ updateBuilder = updateBuilder.Set(s => s.EndDate, request.EndDate.Value);
    // Check permission
             var (hasPermission, currentUser, _) = await CheckSprintPermissionAsync(sprint.ProjectId, userId);
             if (!hasPermission)
-  {
-                throw new ForbiddenException("You don't have permission to start this sprint. Only project owners, team managers, or administrators can start sprints.");
-   }
+            {
+                // Allow manager who created the sprint to start it even if they're not a team member
+                if (!(currentUser?.Role == UserRole.Manager && sprint.CreatedBy == userId))
+                {
+                    throw new ForbiddenException("You don't have permission to start this sprint. Only project owners, team managers, or administrators can start sprints.");
+                }
+
+                _logger.LogInformation("Manager {UserId} is allowed to start sprint {SprintId} because they created it", userId, sprintId);
+            }
 
             if (sprint.Status != SprintStatus.Planning)
-         {
-    _logger.LogWarning("Cannot start sprint {SprintId}: Current status is {Status}", sprintId, sprint.Status);
-       throw new BusinessRuleViolationException($"Cannot start sprint: Current status is {sprint.Status}", "INVALID_STATUS");
- }
+            {
+                _logger.LogWarning("Cannot start sprint {SprintId}: Current status is {Status}", sprintId, sprint.Status);
+                throw new BusinessRuleViolationException($"Cannot start sprint: Current status is {sprint.Status}", "INVALID_STATUS");
+            }
 
             // Check if there's already an active sprint for this project
   var existingActive = await _context.Sprints

@@ -95,6 +95,11 @@ dotnet run
 The API will be available at `http://localhost:5000`
 Swagger UI: `http://localhost:5000/swagger`
 
+**Weather service**
+The Weather proxy now uses the free Open‑Meteo APIs (no API key required). The backend calls Open‑Meteo for geocoding and forecast data, and the frontend calls the backend endpoints `/api/weather/geocode` and `/api/weather/report`.
+
+If Open‑Meteo is temporarily unavailable, the UI will show a friendly error and a retry option.
+
 ### Frontend Setup
 ```bash
 cd sprinttracker-ui

@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { AxiosError } from 'axios';
 import { sprintService } from '@/services/sprintService';
 import { sprintSubmissionService, UserStoryRequest, FeatureRequest, ImpedimentRequest, AppreciationRequest } from '@/services/sprintSubmissionService';
-import { Sprint, SprintSubmission, SubmissionStatus, ApiResponse } from '@/types';
+import { Sprint, SprintSubmission, SubmissionStatus, ApiResponse, UserRole } from '@/types';
 import { Card, Button, Loader, Input, Textarea, Badge } from '@/components/ui';
+import { useAuthStore } from '@/store/authStore';
 import { ArrowLeft, Save, Send, Plus, Trash2, CheckCircle, RotateCcw, AlertCircle } from 'lucide-react';
 
 export default function SprintSubmissionPage() {
@@ -39,11 +40,19 @@ export default function SprintSubmissionPage() {
   const [impediments, setImpediments] = useState<ImpedimentRequest[]>([]);
   const [appreciations, setAppreciations] = useState<AppreciationRequest[]>([]);
 
+  const { user } = useAuthStore();
+  const isDeveloper = user?.role === UserRole.Developer;
+
   useEffect(() => {
     if (sprintId) {
+      if (!isDeveloper) {
+        setError('Only developers can submit sprint details.');
+        setIsLoading(false);
+        return;
+      }
       loadData();
     }
-  }, [sprintId]);
+  }, [sprintId, isDeveloper]);
 
   const loadData = async () => {
     try {
@@ -130,6 +139,27 @@ export default function SprintSubmissionPage() {
         setError(response.message || 'Failed to save');
       }
     } catch (err) {
+      // Handle already-submitted business rule gracefully by refreshing submission state
+      if (err instanceof AxiosError && err.response?.data) {
+        const data = err.response.data as ApiResponse<any>;
+        const codes: string[] = data.errors || [];
+        if (codes.includes('SUBMISSION_ALREADY_SUBMITTED') || codes.includes('ALREADY_SUBMITTED')) {
+          try {
+            const res = await sprintSubmissionService.getMySubmission(sprintId);
+            if (res.success && res.data) {
+              setSubmission(res.data);
+              setError('This submission has already been submitted and is now read-only.');
+            } else {
+              setError(data.message || 'This submission has already been submitted');
+            }
+          } catch (e) {
+            setError(data.message || 'This submission has already been submitted');
+          }
+          setIsSaving(false);
+          return;
+        }
+      }
+
       setError(extractErrorMessage(err));
       console.error('Save error:', err);
     } finally {
@@ -148,12 +178,40 @@ export default function SprintSubmissionPage() {
     setSuccessMessage('');
 
     try {
+      // Client-side validation and adjustments to avoid server-side BusinessRuleViolation
+      const completed = Number(formData.storyPointsCompleted || 0);
+      let planned = Number(formData.storyPointsPlanned || 0);
+
+      // Sanitize user stories similarly to the service so we only sum valid items
+      const sanitizedUserStories = (userStories || [])
+        .map((u) => ({
+          storyId: (u.storyId || '').toString().trim(),
+          title: (u.title || '').toString().trim(),
+          storyPoints: Number.isFinite(Number(u.storyPoints)) ? Math.max(0, Math.trunc(Number(u.storyPoints))) : 0,
+          status: (u.status || 'Completed').toString().trim(),
+        }))
+        .filter((u) => u.storyId && u.title);
+
+      const sumFromStories = sanitizedUserStories.reduce((s, u) => s + (u.storyPoints || 0), 0);
+
+      // If planned not provided, use story sum. Ensure planned at least equals completed.
+      if (!planned || planned <= 0) planned = sumFromStories;
+      const adjustedPlanned = Math.max(planned || 0, sumFromStories, completed);
+
+      if (completed > adjustedPlanned) {
+        setError(`Cannot submit: completed story points (${completed}) exceed planned (${adjustedPlanned}). Update planned points or adjust your stories before submitting.`);
+        setIsSubmitting(false);
+        return;
+      }
+
       let subId = submission?.id;
-      
+
       if (!subId) {
+        // When saving before submitting, send the adjusted planned and sanitized arrays to keep server and client consistent
         const saveRes = await sprintSubmissionService.saveSubmission(sprintId, {
           ...formData,
-          userStories,
+          storyPointsPlanned: adjustedPlanned,
+          userStories: sanitizedUserStories,
           featuresDelivered: features,
           impediments,
           appreciations,
@@ -164,6 +222,23 @@ export default function SprintSubmissionPage() {
         } else {
           setError(saveRes.message || 'Failed to save before submitting');
           return;
+        }
+      } else {
+        // If already have a submission id, ensure server submission has correct planned value; do a quick update if needed
+        if (Number(formData.storyPointsPlanned || 0) !== adjustedPlanned) {
+          // Best-effort update to set planned before submit
+          try {
+            await sprintSubmissionService.saveSubmission(sprintId, {
+              ...formData,
+              storyPointsPlanned: adjustedPlanned,
+              userStories: sanitizedUserStories,
+              featuresDelivered: features,
+              impediments,
+              appreciations,
+            });
+          } catch (e) {
+            // Ignore; submit attempt will still run and server will validate
+          }
         }
       }
 
@@ -178,6 +253,30 @@ export default function SprintSubmissionPage() {
         setError(response.message || 'Failed to submit');
       }
     } catch (err) {
+      // If server reports submission already submitted, refresh the submission and inform user
+      if (err instanceof AxiosError && err.response?.data) {
+        const data = err.response.data as ApiResponse<any>;
+        const codes: string[] = data.errors || [];
+        if (codes.includes('ALREADY_SUBMITTED') || codes.includes('SUBMISSION_ALREADY_SUBMITTED')) {
+          try {
+            const res = await sprintSubmissionService.getMySubmission(sprintId);
+            if (res.success && res.data) {
+              setSubmission(res.data);
+              setSuccessMessage('This submission was already submitted. Redirecting to report...');
+              setTimeout(() => router.push(`/sprints/${sprintId}/report`), 1500);
+              setIsSubmitting(false);
+              return;
+            }
+          } catch (e) {
+            // fallthrough
+          }
+
+          setError(data.message || 'This submission has already been submitted');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       setError(extractErrorMessage(err));
       console.error('Submit error:', err);
     } finally {

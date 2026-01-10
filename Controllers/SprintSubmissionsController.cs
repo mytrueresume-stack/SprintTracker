@@ -119,6 +119,14 @@ public class SprintSubmissionsController : ControllerBase
         {
       var userId = GetUserId();
 
+            // Only Developers should submit sprint details
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Developer";
+            if (roleClaim != SprintTracker.Api.Models.UserRole.Developer.ToString())
+            {
+                _logger.LogWarning("SaveSubmission forbidden for user {User} with role {Role}", User?.Identity?.Name ?? "Unknown", roleClaim);
+                return StatusCode(StatusCodes.Status403Forbidden, new ApiResponse<SprintSubmission>(false, null, "Insufficient permissions to submit sprint details", null));
+            }
+
    var sprint = await _sprintService.GetSprintByIdAsync(sprintId);
     if (sprint == null)
        {
@@ -214,6 +222,14 @@ Status = (us.Status ?? "Completed").Trim(),
      try
         {
       var userId = GetUserId();
+
+            // Only Developers can submit sprint details
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Developer";
+            if (roleClaim != SprintTracker.Api.Models.UserRole.Developer.ToString())
+            {
+                _logger.LogWarning("SubmitSubmission forbidden for user {User} with role {Role}", User?.Identity?.Name ?? "Unknown", roleClaim);
+                return StatusCode(StatusCodes.Status403Forbidden, new ApiResponse<SprintSubmission>(false, null, "Insufficient permissions to submit sprint details", null));
+            }
 
       _logger.LogDebug("Attempting to submit submission {SubmissionId} for user {UserId}", submissionId, userId);
 
@@ -318,6 +334,14 @@ Status = (us.Status ?? "Completed").Trim(),
   if (string.IsNullOrWhiteSpace(sprintId))
      {
       return BadRequest(new ApiResponse<SprintReportData>(false, null, "Sprint ID is required", null));
+        }
+
+        // Authorization: only Manager or Admin can view reports
+        var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Developer";
+        if (roleClaim != SprintTracker.Api.Models.UserRole.Manager.ToString() && roleClaim != SprintTracker.Api.Models.UserRole.Admin.ToString())
+        {
+            _logger.LogWarning("GetSprintReport forbidden for user {User} with role {Role}", User?.Identity?.Name ?? "Unknown", roleClaim);
+            return StatusCode(StatusCodes.Status403Forbidden, new ApiResponse<SprintReportData>(false, null, "Insufficient permissions", null));
         }
 
    try
