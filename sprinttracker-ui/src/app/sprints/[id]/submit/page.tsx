@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { AxiosError } from 'axios';
 import { sprintService } from '@/services/sprintService';
 import { sprintSubmissionService, UserStoryRequest, FeatureRequest, ImpedimentRequest, AppreciationRequest } from '@/services/sprintSubmissionService';
-import { Sprint, SprintSubmission, SubmissionStatus } from '@/types';
+import { Sprint, SprintSubmission, SubmissionStatus, ApiResponse } from '@/types';
 import { Card, Button, Loader, Input, Textarea, Badge } from '@/components/ui';
-import { ArrowLeft, Save, Send, Plus, Trash2, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, Send, Plus, Trash2, CheckCircle, RotateCcw, AlertCircle } from 'lucide-react';
 
 export default function SprintSubmissionPage() {
   const params = useParams();
@@ -19,6 +20,7 @@ export default function SprintSubmissionPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReopening, setIsReopening] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -103,6 +105,11 @@ export default function SprintSubmissionPage() {
   };
 
   const handleSave = async () => {
+    if (isReadOnly) {
+      setError('Cannot save - submission has already been submitted. Please reopen to edit.');
+      return;
+    }
+    
     setIsSaving(true);
     setError('');
     setSuccessMessage('');
@@ -123,23 +130,26 @@ export default function SprintSubmissionPage() {
         setError(response.message || 'Failed to save');
       }
     } catch (err) {
-      setError('Failed to save submission');
-      console.error(err);
+      setError(extractErrorMessage(err));
+      console.error('Save error:', err);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (!submission) {
-      await handleSave();
+    if (isReadOnly) {
+      setError('This submission has already been submitted. Please reopen to make changes.');
+      return;
     }
 
     setIsSubmitting(true);
     setError('');
+    setSuccessMessage('');
 
     try {
-      const subId = submission?.id;
+      let subId = submission?.id;
+      
       if (!subId) {
         const saveRes = await sprintSubmissionService.saveSubmission(sprintId, {
           ...formData,
@@ -149,24 +159,27 @@ export default function SprintSubmissionPage() {
           appreciations,
         });
         if (saveRes.success && saveRes.data) {
-          const submitRes = await sprintSubmissionService.submitSubmission(saveRes.data.id);
-          if (submitRes.success) {
-            setSuccessMessage('Submission completed successfully');
-            router.push(`/sprints/${sprintId}/report`);
-          }
-        }
-      } else {
-        const response = await sprintSubmissionService.submitSubmission(subId);
-        if (response.success) {
-          setSuccessMessage('Submission completed successfully');
-          router.push(`/sprints/${sprintId}/report`);
+          subId = saveRes.data.id;
+          setSubmission(saveRes.data);
         } else {
-          setError(response.message || 'Failed to submit');
+          setError(saveRes.message || 'Failed to save before submitting');
+          return;
         }
       }
+
+      const response = await sprintSubmissionService.submitSubmission(subId);
+      if (response.success && response.data) {
+        setSubmission(response.data);
+        setSuccessMessage('Submission completed successfully! Redirecting to report...');
+        setTimeout(() => {
+          router.push(`/sprints/${sprintId}/report`);
+        }, 1500);
+      } else {
+        setError(response.message || 'Failed to submit');
+      }
     } catch (err) {
-      setError('Failed to submit');
-      console.error(err);
+      setError(extractErrorMessage(err));
+      console.error('Submit error:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -205,6 +218,39 @@ export default function SprintSubmissionPage() {
     }]);
   };
 
+  const extractErrorMessage = (err: unknown): string => {
+    if (err instanceof AxiosError && err.response?.data) {
+      const data = err.response.data as ApiResponse<unknown>;
+      if (data.message) return data.message;
+      if (data.errors && data.errors.length > 0) return data.errors.join(', ');
+    }
+    if (err instanceof Error) return err.message;
+    return 'An unexpected error occurred';
+  };
+
+  const handleReopen = async () => {
+    if (!submission?.id) return;
+    
+    setIsReopening(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const response = await sprintSubmissionService.reopenSubmission(submission.id);
+      if (response.success && response.data) {
+        setSubmission(response.data);
+        setSuccessMessage('Submission reopened for editing');
+      } else {
+        setError(response.message || 'Failed to reopen submission');
+      }
+    } catch (err) {
+      setError(extractErrorMessage(err));
+      console.error('Reopen error:', err);
+    } finally {
+      setIsReopening(false);
+    }
+  };
+
   const isReadOnly = submission?.status === SubmissionStatus.Submitted;
 
   if (isLoading) {
@@ -237,8 +283,9 @@ export default function SprintSubmissionPage() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {error}
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-start">
+          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -592,7 +639,26 @@ export default function SprintSubmissionPage() {
           </div>
         </Card>
 
-        {!isReadOnly && (
+        {isReadOnly ? (
+          <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+            <CheckCircle className="h-12 w-12 text-green-500 mb-3" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Submission Complete</h3>
+            <p className="text-gray-600 text-center mb-4">
+              Your sprint submission has been submitted successfully. You can view the report or reopen to make changes.
+            </p>
+            <div className="flex space-x-3">
+              <Button variant="outline" onClick={handleReopen} isLoading={isReopening}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reopen for Editing
+              </Button>
+              <Link href={`/sprints/${sprintId}/report`}>
+                <Button>
+                  View Report
+                </Button>
+              </Link>
+            </div>
+          </div>
+        ) : (
           <div className="flex justify-end space-x-3">
             <Button variant="outline" onClick={handleSave} isLoading={isSaving}>
               <Save className="h-4 w-4 mr-2" />

@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { dashboardService } from '@/services/dashboardService';
 import { DashboardStats, SprintStatus } from '@/types';
-import { Card, StatCard, Loader, Badge, EmptyState } from '@/components/ui';
-import { FolderKanban, Zap, CheckCircle, Clock, ArrowRight } from 'lucide-react';
+import { Card, StatCard, Loader, Badge, EmptyState, ProgressRing } from '@/components/ui';
+import { FolderKanban, Zap, CheckCircle, Clock, ArrowRight, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function DashboardPage() {
@@ -155,33 +155,57 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-4">
-            <div className="p-4 bg-blue-50 rounded-lg">
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
               <div className="flex items-center justify-between">
-                <span className="text-blue-700 font-medium">Total Tasks</span>
-                <span className="text-2xl font-bold text-blue-700">{stats?.totalTasks || 0}</span>
+                <div>
+                  <span className="text-blue-700 font-medium block">Total Tasks</span>
+                  <span className="text-3xl font-bold text-blue-700">{stats?.totalTasks || 0}</span>
+                </div>
+                <div className="p-3 bg-blue-200 rounded-full">
+                  <TrendingUp className="h-6 w-6 text-blue-700" />
+                </div>
               </div>
             </div>
 
-            <div className="p-4 bg-yellow-50 rounded-lg">
+            <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
               <div className="flex items-center justify-between">
-                <span className="text-yellow-700 font-medium">Tasks Blocked</span>
-                <span className="text-2xl font-bold text-yellow-700">{stats?.tasksBlocked || 0}</span>
+                <div>
+                  <span className="text-green-700 font-medium block">Completion Rate</span>
+                  <span className="text-sm text-green-600">
+                    {stats?.tasksCompleted || 0} of {stats?.totalTasks || 0} tasks
+                  </span>
+                </div>
+                <ProgressRing
+                  progress={stats?.totalTasks ? Math.round((stats.tasksCompleted / stats.totalTasks) * 100) : 0}
+                  size={70}
+                  strokeWidth={7}
+                  color="#16A34A"
+                  backgroundColor="#BBF7D0"
+                />
               </div>
             </div>
 
-            <div className="p-4 bg-green-50 rounded-lg">
+            <div className="p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg">
               <div className="flex items-center justify-between">
-                <span className="text-green-700 font-medium">Completion Rate</span>
-                <span className="text-2xl font-bold text-green-700">
-                  {stats?.totalTasks ? Math.round((stats.tasksCompleted / stats.totalTasks) * 100) : 0}%
-                </span>
+                <div>
+                  <span className="text-yellow-700 font-medium block">Tasks Blocked</span>
+                  <span className="text-3xl font-bold text-yellow-700">{stats?.tasksBlocked || 0}</span>
+                </div>
+                <div className="p-3 bg-yellow-200 rounded-full">
+                  <Clock className="h-6 w-6 text-yellow-700" />
+                </div>
               </div>
             </div>
 
-            <div className="p-4 bg-purple-50 rounded-lg">
+            <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg">
               <div className="flex items-center justify-between">
-                <span className="text-purple-700 font-medium">Active Projects</span>
-                <span className="text-2xl font-bold text-purple-700">{stats?.totalProjects || 0}</span>
+                <div>
+                  <span className="text-purple-700 font-medium block">Active Projects</span>
+                  <span className="text-3xl font-bold text-purple-700">{stats?.totalProjects || 0}</span>
+                </div>
+                <div className="p-3 bg-purple-200 rounded-full">
+                  <FolderKanban className="h-6 w-6 text-purple-700" />
+                </div>
               </div>
             </div>
           </div>

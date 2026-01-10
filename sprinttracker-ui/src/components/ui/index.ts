@@ -8,3 +8,4 @@ export { default as Textarea } from './Textarea';
 export { default as Loader } from './Loader';
 export { default as StatCard } from './StatCard';
 export { default as EmptyState } from './EmptyState';
+export { default as ProgressRing } from './ProgressRing';
