@@ -145,7 +145,7 @@ public abstract class BasePage
     /// <summary>
     /// Execute JavaScript
     /// </summary>
-    protected object ExecuteScript(string script, params object[] args)
+    protected object? ExecuteScript(string script, params object[] args)
     {
         return ((IJavaScriptExecutor)Driver).ExecuteScript(script, args);
     }
