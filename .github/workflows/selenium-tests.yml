@@ -1,0 +1,121 @@
+name: Selenium E2E Tests
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+  workflow_dispatch:
+
+jobs:
+  selenium-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:latest
+        ports:
+          - 27017:27017
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: password
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies - API
+      run: dotnet restore SprintTracker.Api.csproj
+    
+    - name: Build API
+      run: dotnet build SprintTracker.Api.csproj --configuration Release --no-restore
+    
+    - name: Install dependencies - UI
+      working-directory: ./sprinttracker-ui
+      run: npm ci
+    
+    - name: Build UI
+      working-directory: ./sprinttracker-ui
+      run: npm run build
+    
+    - name: Start API
+      run: |
+        dotnet run --project SprintTracker.Api.csproj &
+        echo $! > api.pid
+        sleep 10
+      env:
+        ASPNETCORE_ENVIRONMENT: Development
+        ASPNETCORE_URLS: http://localhost:5000
+        ConnectionStrings__MongoDB: mongodb://admin:password@localhost:27017
+    
+    - name: Start UI
+      working-directory: ./sprinttracker-ui
+      run: |
+        npm start &
+        echo $! > ui.pid
+        sleep 10
+      env:
+        NEXT_PUBLIC_API_URL: http://localhost:5000
+    
+    - name: Wait for services to be ready
+      run: |
+        echo "Waiting for API..."
+        timeout 60 bash -c 'until curl -f http://localhost:5000/health; do sleep 2; done'
+        echo "Waiting for UI..."
+        timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
+    
+    - name: Install Selenium dependencies
+      run: dotnet restore SprintTracker.Tests.Selenium/SprintTracker.Tests.Selenium.csproj
+    
+    - name: Build Selenium Tests
+      run: dotnet build SprintTracker.Tests.Selenium/SprintTracker.Tests.Selenium.csproj --configuration Release --no-restore
+    
+    - name: Run Selenium Tests
+      run: dotnet test SprintTracker.Tests.Selenium/SprintTracker.Tests.Selenium.csproj --no-build --configuration Release --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=detailed"
+      env:
+        FRONTEND_URL: http://localhost:3000
+        API_URL: http://localhost:5000
+        BROWSER: chrome
+        HEADLESS: true
+        DEFAULT_TIMEOUT: 15
+        SCREENSHOTS: true
+    
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: |
+          SprintTracker.Tests.Selenium/TestResults/
+          **/test-results.trx
+    
+    - name: Upload Screenshots
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: failure-screenshots
+        path: SprintTracker.Tests.Selenium/TestResults/*.png
+    
+    - name: Stop services
+      if: always()
+      run: |
+        if [ -f api.pid ]; then kill $(cat api.pid) || true; fi
+        if [ -f sprinttracker-ui/ui.pid ]; then kill $(cat sprinttracker-ui/ui.pid) || true; fi
+    
+    - name: Publish Test Report
+      if: always()
+      uses: dorny/test-reporter@v1
+      with:
+        name: Selenium Test Results
+        path: '**/test-results.trx'
+        reporter: dotnet-trx

@@ -15,16 +15,18 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
 export default function SprintReportPage() {
-  const params = useParams();
-  const sprintId = params.id as string;
+const params = useParams();
+const sprintId = params.id as string;
 
-  const [sprint, setSprint] = useState<Sprint | null>(null);
-  const [report, setReport] = useState<SprintReportData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+const [sprint, setSprint] = useState<Sprint | null>(null);
+const [report, setReport] = useState<SprintReportData | null>(null);
+const [isLoading, setIsLoading] = useState(true);
+const [error, setError] = useState('');
+const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+const [selectedUserDetail, setSelectedUserDetail] = useState<any | null>(null);
 
-  const { user } = useAuthStore();
-  const isManager = user?.role === UserRole.Manager || user?.role === UserRole.Admin;
+const { user } = useAuthStore();
+const isManager = user?.role === UserRole.Manager || user?.role === UserRole.Admin;
 
   useEffect(() => {
     if (sprintId) {
@@ -82,9 +84,6 @@ export default function SprintReportPage() {
     planned: user.storyPointsPlanned,
     completed: user.storyPointsCompleted,
   })) || [];
-
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [selectedUserDetail, setSelectedUserDetail] = useState<any | null>(null);
 
   const openUserDetail = (userId: string) => {
     setSelectedUserId(userId);
